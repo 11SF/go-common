@@ -1,22 +1,20 @@
 package database
 
-import "gorm.io/gorm"
-
-// type Config struct {
-// 	Host     string
-// 	Password string
-// 	Port     int
-// 	DBName   string
-// 	TimeZone string
-// }
+import (
+	"gorm.io/gorm"
+)
 
 type Config struct {
 	Dial       gorm.Dialector
 	GormConfig gorm.Config
 }
 
-func (cf *Config) InitDatabase() (*gorm.DB, error) {
+func InitDatabase(cf *Config) (*gorm.DB, error) {
 	db, err := gorm.Open(cf.Dial, &cf.GormConfig)
+	if err != nil {
+		return nil, err
+	}
+	err = db.Exec("SELECT 1").Error
 	if err != nil {
 		return nil, err
 	}

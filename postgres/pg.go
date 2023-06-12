@@ -17,7 +17,7 @@ type Config struct {
 	TimeZone string
 }
 
-func (cf *Config) ConnectPostgres() (gorm.Dialector, error) {
+func ConnectPostgres(cf *Config) (gorm.Dialector, error) {
 	if cf.TimeZone == "" {
 		cf.TimeZone = "Asia/bangkok"
 	}
