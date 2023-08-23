@@ -1,4 +1,4 @@
-package ginresponse
+package response
 
 import (
 	"fmt"
@@ -28,7 +28,7 @@ func NewError(code string, err string) error {
 	}
 }
 
-func NewResponse(c *gin.Context, httpStatusCode int, data interface{}) {
+func NewGinResponse(c *gin.Context, httpStatusCode int, data interface{}) {
 	c.JSON(httpStatusCode, response{
 		Code:    "00000",
 		Message: "",
@@ -36,6 +36,6 @@ func NewResponse(c *gin.Context, httpStatusCode int, data interface{}) {
 	})
 }
 
-func NewResponseError(c *gin.Context, httpStatusCode int, err error) {
+func NewGinResponseError(c *gin.Context, httpStatusCode int, err error) {
 	c.JSON(httpStatusCode, err)
 }
