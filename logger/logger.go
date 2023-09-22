@@ -11,9 +11,7 @@ type Config struct {
 	LogLevel string
 }
 
-var logger *zap.Logger
-
-func CreateLogger(cf Config) {
+func CreateLogger(cf Config) *zap.Logger {
 	encoderCfg := zap.NewProductionEncoderConfig()
 	encoderCfg.TimeKey = "timestamp"
 	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
@@ -49,5 +47,5 @@ func CreateLogger(cf Config) {
 		},
 	}
 
-	logger = zap.Must(config.Build())
+	return zap.Must(config.Build())
 }
