@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
 	"github.com/labstack/echo/v4"
 )
 
@@ -61,4 +62,26 @@ func NewEchoResponseError(c echo.Context, httpStatusCode int, err error) error {
 	}
 
 	return c.JSON(httpStatusCode, errRes)
+}
+
+func NewFiberResponse(c *fiber.Ctx, statusCode ResponseCode, data interface{}) error {
+	return c.Status(http.StatusOK).JSON(response{
+		Code:    "00000",
+		Message: "",
+		Data:    data,
+	})
+}
+
+func NewFiberResponseError(c *fiber.Ctx, httpStatusCode int, err error) error {
+
+	errRes := &responseError{
+		Code:    GenericError,
+		Message: "Internal server error",
+	}
+
+	if err, ok := err.(*responseError); ok {
+		errRes = err
+	}
+
+	return c.Status(httpStatusCode).JSON(errRes)
 }
