@@ -1,6 +1,6 @@
 module github.com/11SF/go-common
 
-go 1.20
+go 1.23
 
 require (
 	github.com/Shopify/sarama v1.38.1
@@ -8,6 +8,7 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.4
 	github.com/labstack/echo/v4 v4.11.1
 	github.com/spf13/viper v1.16.0
+	github.com/valyala/fasthttp v1.51.0
 	go.uber.org/zap v1.26.0
 	gorm.io/driver/postgres v1.5.2
 	gorm.io/gorm v1.25.4
@@ -68,7 +69,6 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.51.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
