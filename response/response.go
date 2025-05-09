@@ -9,10 +9,10 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type response struct {
+type Type[T any] struct {
 	Code    ResponseCode `json:"code"`
 	Message string       `json:"message"`
-	Data    interface{}  `json:"data"`
+	Data    T            `json:"data"`
 }
 
 type responseError struct {
@@ -31,8 +31,8 @@ func NewError(code ResponseCode, err string) error {
 	}
 }
 
-func NewGinResponse(c *gin.Context, httpStatusCode int, data interface{}) {
-	c.JSON(httpStatusCode, response{
+func NewGinResponse[T any](c *gin.Context, httpStatusCode int, data T) {
+	c.JSON(httpStatusCode, Type[T]{
 		Code:    "00000",
 		Message: "",
 		Data:    data,
@@ -43,8 +43,8 @@ func NewGinResponseError(c *gin.Context, httpStatusCode int, err error) {
 	c.JSON(httpStatusCode, err)
 }
 
-func NewEchoResponse(c echo.Context, statusCode ResponseCode, data interface{}) error {
-	return c.JSON(http.StatusOK, response{
+func NewEchoResponse[T any](c echo.Context, statusCode ResponseCode, data T) error {
+	return c.JSON(http.StatusOK, Type[T]{
 		Code:    "00000",
 		Message: "",
 		Data:    data,
@@ -64,19 +64,22 @@ func NewEchoResponseError(c echo.Context, httpStatusCode int, err error) error {
 	return c.JSON(httpStatusCode, errRes)
 }
 
-func NewFiberResponse(c *fiber.Ctx, statusCode ResponseCode, data interface{}) error {
-	return c.Status(http.StatusOK).JSON(response{
+func NewFiberResponse[T any](c *fiber.Ctx, data T) error {
+	return c.Status(http.StatusOK).JSON(Type[T]{
 		Code:    "00000",
-		Message: "",
+		Message: "success",
 		Data:    data,
 	})
 }
 
 func NewFiberResponseError(c *fiber.Ctx, httpStatusCode int, err error) error {
-
 	errRes := &responseError{
 		Code:    GenericError,
 		Message: "Internal server error",
+	}
+
+	if err != nil {
+		errRes.Message = err.Error()
 	}
 
 	if err, ok := err.(*responseError); ok {
