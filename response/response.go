@@ -33,8 +33,8 @@ func NewError(code ResponseCode, err string) error {
 
 func NewGinResponse[T any](c *gin.Context, httpStatusCode int, data T) {
 	c.JSON(httpStatusCode, Type[T]{
-		Code:    "00000",
-		Message: "",
+		Code:    SuccessCode,
+		Message: "success",
 		Data:    data,
 	})
 }
@@ -45,8 +45,8 @@ func NewGinResponseError(c *gin.Context, httpStatusCode int, err error) {
 
 func NewEchoResponse[T any](c echo.Context, statusCode ResponseCode, data T) error {
 	return c.JSON(http.StatusOK, Type[T]{
-		Code:    "00000",
-		Message: "",
+		Code:    SuccessCode,
+		Message: "success",
 		Data:    data,
 	})
 }
@@ -66,7 +66,7 @@ func NewEchoResponseError(c echo.Context, httpStatusCode int, err error) error {
 
 func NewFiberResponse[T any](c *fiber.Ctx, data T) error {
 	return c.Status(http.StatusOK).JSON(Type[T]{
-		Code:    "00000",
+		Code:    SuccessCode,
 		Message: "success",
 		Data:    data,
 	})
