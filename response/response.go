@@ -40,7 +40,19 @@ func NewGinResponse[T any](c *gin.Context, httpStatusCode int, data T) {
 }
 
 func NewGinResponseError(c *gin.Context, httpStatusCode int, err error) {
-	c.JSON(httpStatusCode, err)
+	errRes := &responseError{
+		Code:    GenericError,
+		Message: "internal server error",
+	}
+
+	if err != nil {
+		errRes.Message = err.Error()
+	}
+
+	if err, ok := err.(*responseError); ok {
+		errRes = err
+	}
+	c.JSON(httpStatusCode, errRes)
 }
 
 func NewEchoResponse[T any](c echo.Context, statusCode ResponseCode, data T) error {

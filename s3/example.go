@@ -9,41 +9,25 @@ import (
 )
 
 func ExampleUsage() {
-	// AWS S3 Configuration
-	awsConfig := &Config{
-		Region:          "us-east-1",
-		AccessKeyID:     "your-access-key-id",
-		SecretAccessKey: "your-secret-access-key",
-		BucketName:      "your-bucket-name",
-		UseSSL:          true,
-	}
+	// Explicit Provider Configuration (Recommended)
 
-	// MinIO Configuration (uncomment to use)
-	/*
-	minioConfig := &Config{
-		Region:          "us-east-1",
-		AccessKeyID:     "minioadmin",
-		SecretAccessKey: "minioadmin",
-		Endpoint:        "http://localhost:9000",
-		BucketName:      "test-bucket",
-		UseSSL:          false,
-	}
-	*/
+	// AWS S3 - explicit provider
+	config := NewConfig(ProviderAWS, "us-east-1", "your-access-key-id", "your-secret-access-key", "", "your-bucket-name")
 
-	// DigitalOcean Spaces Configuration (uncomment to use)
-	/*
-	doConfig := &Config{
-		Region:          "nyc3",
-		AccessKeyID:     "your-do-access-key",
-		SecretAccessKey: "your-do-secret-key",
-		Endpoint:        "https://nyc3.digitaloceanspaces.com",
-		BucketName:      "your-space-name",
-		UseSSL:          true,
-	}
-	*/
+	// MinIO - explicit provider
+	// config := NewConfig(ProviderMinIO, "", "minioadmin", "minioadmin", "http://localhost:9000", "test-bucket")
 
-	// Use any of the configurations above
-	client, err := NewClient(awsConfig)
+	// DigitalOcean Spaces - explicit provider
+	// config := NewConfig(ProviderDigitalOcean, "nyc3", "your-do-access-key", "your-do-secret-key", "https://nyc3.digitaloceanspaces.com", "your-space-name")
+
+	// Custom S3-compatible service
+	// config := NewConfig(ProviderCustom, "us-east-1", "access-key", "secret-key", "https://s3.example.com", "bucket-name")
+
+	// Auto-detect provider (legacy method)
+	// config := NewConfigAuto("us-east-1", "your-access-key-id", "your-secret-access-key", "", "your-bucket-name")
+
+	// Create client - same function for all providers!
+	client, err := NewClient(config)
 	if err != nil {
 		log.Fatalf("Failed to create S3 client: %v", err)
 	}
@@ -146,13 +130,7 @@ func ExampleUsage() {
 }
 
 func ExampleWithReader() {
-	config := &Config{
-		Region:          "us-east-1",
-		AccessKeyID:     "your-access-key-id",
-		SecretAccessKey: "your-secret-access-key",
-		BucketName:      "your-bucket-name",
-		UseSSL:          true,
-	}
+	config := NewConfig(ProviderAWS, "us-east-1", "your-access-key-id", "your-secret-access-key", "", "your-bucket-name")
 
 	client, err := NewClient(config)
 	if err != nil {
