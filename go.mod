@@ -16,6 +16,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo/v4 v4.11.1
 	github.com/redis/go-redis/v9 v9.8.0
+	github.com/samber/lo v1.52.0
 	github.com/spf13/viper v1.16.0
 	github.com/uptrace/bun v1.2.15
 	github.com/uptrace/bun/dialect/pgdialect v1.2.15
@@ -48,6 +49,7 @@ require (
 	github.com/aws/smithy-go v1.23.0 // indirect
 	github.com/bytedance/sonic v1.14.0 // indirect
 	github.com/bytedance/sonic/loader v0.3.0 // indirect
+	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
