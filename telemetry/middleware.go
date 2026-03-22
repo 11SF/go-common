@@ -2,12 +2,77 @@ package telemetry
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
+	"github.com/labstack/echo/v4"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
+
+// GinRequestIDMiddleware injects a request ID into the gin context.
+// Reads from the header key (default: x-request-id), generates a UUID v7 if missing.
+func GinRequestIDMiddleware(key ...string) gin.HandlerFunc {
+	k := resolveKey(key...)
+	return func(c *gin.Context) {
+		requestID := c.GetHeader(k)
+		if requestID == "" {
+			requestID = generateRequestID()
+		}
+
+		ctx := SetRequestID(c.Request.Context(), requestID)
+		c.Request = c.Request.WithContext(ctx)
+		c.Header(k, requestID)
+
+		c.Next()
+	}
+}
+
+// EchoRequestIDMiddleware injects a request ID into the echo context.
+// Reads from the header key (default: x-request-id), generates a UUID v7 if missing.
+func EchoRequestIDMiddleware(key ...string) echo.MiddlewareFunc {
+	k := resolveKey(key...)
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			requestID := c.Request().Header.Get(k)
+			if requestID == "" {
+				requestID = generateRequestID()
+			}
+
+			ctx := SetRequestID(c.Request().Context(), requestID)
+			c.SetRequest(c.Request().WithContext(ctx))
+			c.Response().Header().Set(k, requestID)
+
+			return next(c)
+		}
+	}
+}
+
+// FiberRequestIDMiddleware injects a request ID into the fiber context.
+// Reads from the header key (default: x-request-id), generates a UUID v7 if missing.
+func FiberRequestIDMiddleware(key ...string) fiber.Handler {
+	k := resolveKey(key...)
+	return func(c *fiber.Ctx) error {
+		requestID := c.Get(k)
+		if requestID == "" {
+			requestID = generateRequestID()
+		}
+
+		ctx := SetRequestID(c.UserContext(), requestID)
+		c.SetUserContext(ctx)
+		c.Set(k, requestID)
+
+		return c.Next()
+	}
+}
+
+func resolveKey(key ...string) string {
+	if len(key) > 0 && key[0] != "" {
+		return key[0]
+	}
+	return XRequestIdKey
+}
 
 func GinMiddleware(serviceName string) gin.HandlerFunc {
 	return otelgin.Middleware(serviceName)
