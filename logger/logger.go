@@ -1,178 +1,164 @@
+// Package logger provides a common logging wrapper around Go's log/slog
+// with auto-logging middleware for Gin, Fiber, and Echo frameworks.
 package logger
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"log/slog"
 	"os"
-
-	"github.com/11SF/go-common/telemetry"
+	"runtime"
 )
 
-type contextKey string
-
-const (
-	TraceIDKey contextKey = "trace_id"
-	SpanIDKey  contextKey = "span_id"
-)
-
+// Logger wraps slog.Logger and provides convenience methods for structured logging.
 type Logger struct {
 	*slog.Logger
 }
 
-func New(logLevel slog.Leveler) *Logger {
-	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: logLevel,
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			if a.Key == slog.TimeKey {
-				a.Key = "timestamp"
+// New creates a new Logger wrapping the provided slog.Logger.
+// If l is nil, it uses slog.Default().
+func New(l *slog.Logger) *Logger {
+	if l == nil {
+		l = slog.Default()
+	}
+	return &Logger{Logger: l}
+}
+
+// NewJSONLogger creates a new Logger that outputs JSON to the given writer.
+// If w is nil, output goes to os.Stdout.
+func NewJSONLogger(w *os.File) *Logger {
+	if w == nil {
+		w = os.Stdout
+	}
+	return New(slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})))
+}
+
+// NewTextLogger creates a new Logger that outputs human-readable text to the given writer.
+// If w is nil, output goes to os.Stdout.
+func NewTextLogger(w *os.File) *Logger {
+	if w == nil {
+		w = os.Stdout
+	}
+	return New(slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})))
+}
+
+// With adds structured attributes to the logger.
+// Usage: logger.With("service", "my-service", "version", "1.0.0")
+func (l *Logger) With(args ...any) *Logger {
+	return &Logger{Logger: l.Logger.With(args...)}
+}
+
+// Request logs an incoming request event.
+func (l *Logger) Request(ctx context.Context, msg string, attrs ...any) {
+	l.LogAttrs(ctx, slog.LevelInfo, msg, argsToAttrs(attrs)...)
+}
+
+// Response logs an outgoing response event.
+func (l *Logger) Response(ctx context.Context, msg string, attrs ...any) {
+	l.LogAttrs(ctx, slog.LevelInfo, msg, argsToAttrs(attrs)...)
+}
+
+// Error logs an error event with stack trace information.
+func (l *Logger) Error(ctx context.Context, msg string, err error, attrs ...any) {
+	if err == nil {
+		l.LogAttrs(ctx, slog.LevelError, msg, argsToAttrs(attrs)...)
+		return
+	}
+
+	// Capture stack trace
+	stack := make([]byte, 4096)
+	n := runtime.Stack(stack, false)
+	stack = stack[:n]
+
+	errorAttrs := append([]any{
+		slog.String("error", err.Error()),
+		slog.String("stack", string(stack)),
+	}, attrs...)
+
+	l.LogAttrs(ctx, slog.LevelError, msg, argsToAttrs(errorAttrs)...)
+}
+
+// Warn logs a warning event.
+func (l *Logger) Warn(ctx context.Context, msg string, attrs ...any) {
+	l.LogAttrs(ctx, slog.LevelWarn, msg, argsToAttrs(attrs)...)
+}
+
+// Info logs an info event.
+func (l *Logger) Info(ctx context.Context, msg string, attrs ...any) {
+	l.LogAttrs(ctx, slog.LevelInfo, msg, argsToAttrs(attrs)...)
+}
+
+// Debug logs a debug event.
+func (l *Logger) Debug(ctx context.Context, msg string, attrs ...any) {
+	l.LogAttrs(ctx, slog.LevelDebug, msg, argsToAttrs(attrs)...)
+}
+
+// LogAttrs logs a message with Level and slog.Attr values.
+// This is a thin wrapper around slog.Logger.LogAttrs that preserves the Logger wrapper.
+func (l *Logger) LogAttrs(ctx context.Context, level slog.Level, msg string, attrs ...slog.Attr) {
+	l.Logger.LogAttrs(ctx, level, msg, attrs...)
+}
+
+// argsToAttrs converts a mixed slice of any values to slog.Attr values.
+// Supports: slog.Attr, string key-value pairs, and error types.
+func argsToAttrs(args []any) []slog.Attr {
+	if len(args) == 0 {
+		return nil
+	}
+
+	attrs := make([]slog.Attr, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		switch v := args[i].(type) {
+		case slog.Attr:
+			attrs = append(attrs, v)
+		case string:
+			// Treat as key-value pair: look ahead for the value
+			if i+1 < len(args) {
+				i++
+				attrs = append(attrs, slog.Any(v, args[i]))
+			} else {
+				attrs = append(attrs, slog.String("key", v))
 			}
-			if a.Key == slog.LevelKey {
-				a.Key = "level"
-			}
-			if a.Key == slog.MessageKey {
-				a.Key = "message"
-			}
-			return a
-		},
-	})
-
-	return &Logger{
-		Logger: slog.New(handler),
+		case error:
+			attrs = append(attrs, slog.String("error", v.Error()))
+		default:
+			attrs = append(attrs, slog.Any("value", v))
+		}
 	}
+	return attrs
 }
 
-func Init(logLevel string) {
-	logger := New(getLogLevel(logLevel))
-	slog.SetDefault(logger.Logger)
-}
+// ─── Package-level convenience functions (use slog.Default()) ───
 
-func getLogLevel(logLevel string) slog.Leveler {
-	var slogLevel slog.Leveler
-	switch logLevel {
-	case "INFO":
-		slogLevel = slog.LevelInfo
-	case "ERROR":
-		slogLevel = slog.LevelError
-	case "DEBUG":
-		slogLevel = slog.LevelDebug
-	case "WARN":
-		slogLevel = slog.LevelWarn
-	default:
-		slogLevel = slog.LevelInfo
-	}
-
-	return slogLevel
-}
-
-func (l *Logger) WithTracing(ctx context.Context) *slog.Logger {
-	var args []any
-
-	// Try OpenTelemetry first
-	if traceID := telemetry.TraceID(ctx); traceID != "" {
-		args = append(args, "trace_id", traceID)
-	} else if traceID := GetTraceID(ctx); traceID != "" {
-		args = append(args, "trace_id", traceID)
-	}
-
-	if spanID := telemetry.SpanID(ctx); spanID != "" {
-		args = append(args, "span_id", spanID)
-	} else if spanID := GetSpanID(ctx); spanID != "" {
-		args = append(args, "span_id", spanID)
-	}
-
-	return l.Logger.With(args...)
-}
-
+// Info logs at info level using the default logger.
 func Info(ctx context.Context, msg string, args ...any) {
-	logger := slog.Default()
-	if l, ok := logger.Handler().(*slog.JSONHandler); ok {
-		tempLogger := &Logger{Logger: slog.New(l)}
-		tempLogger.WithTracing(ctx).Info(msg, args...)
-		return
-	}
-	logger.InfoContext(ctx, msg, args...)
+	slog.Default().LogAttrs(ctx, slog.LevelInfo, msg, argsToAttrs(args)...)
 }
 
-func Error(ctx context.Context, msg string, args ...any) {
-	logger := slog.Default()
-	if l, ok := logger.Handler().(*slog.JSONHandler); ok {
-		tempLogger := &Logger{Logger: slog.New(l)}
-		tempLogger.WithTracing(ctx).Error(msg, args...)
-		return
-	}
-	logger.ErrorContext(ctx, msg, args...)
-}
-
+// Warn logs at warn level using the default logger.
 func Warn(ctx context.Context, msg string, args ...any) {
-	logger := slog.Default()
-	if l, ok := logger.Handler().(*slog.JSONHandler); ok {
-		tempLogger := &Logger{Logger: slog.New(l)}
-		tempLogger.WithTracing(ctx).Warn(msg, args...)
-		return
-	}
-	logger.WarnContext(ctx, msg, args...)
+	slog.Default().LogAttrs(ctx, slog.LevelWarn, msg, argsToAttrs(args)...)
 }
 
+// Error logs at error level using the default logger.
+func Error(ctx context.Context, msg string, args ...any) {
+	slog.Default().LogAttrs(ctx, slog.LevelError, msg, argsToAttrs(args)...)
+}
+
+// Debug logs at debug level using the default logger.
 func Debug(ctx context.Context, msg string, args ...any) {
-	logger := slog.Default()
-	if l, ok := logger.Handler().(*slog.JSONHandler); ok {
-		tempLogger := &Logger{Logger: slog.New(l)}
-		tempLogger.WithTracing(ctx).Debug(msg, args...)
-		return
-	}
-	logger.DebugContext(ctx, msg, args...)
+	slog.Default().LogAttrs(ctx, slog.LevelDebug, msg, argsToAttrs(args)...)
 }
 
-func WithTraceID(ctx context.Context, traceID string) context.Context {
-	return context.WithValue(ctx, TraceIDKey, traceID)
-}
-
-func WithSpanID(ctx context.Context, spanID string) context.Context {
-	return context.WithValue(ctx, SpanIDKey, spanID)
-}
-
-func GetTraceID(ctx context.Context) string {
-	if traceID, ok := ctx.Value(TraceIDKey).(string); ok {
-		return traceID
-	}
-	return ""
-}
-
-func GetSpanID(ctx context.Context) string {
-	if spanID, ok := ctx.Value(SpanIDKey).(string); ok {
-		return spanID
-	}
-	return ""
-}
-
-func GenerateTraceID() string {
-	bytes := make([]byte, 16)
-	rand.Read(bytes)
-	return hex.EncodeToString(bytes)
-}
-
-func GenerateSpanID() string {
-	bytes := make([]byte, 8)
-	rand.Read(bytes)
-	return hex.EncodeToString(bytes)
-}
-
-func NewTraceContext(ctx context.Context) context.Context {
-	traceID := GenerateTraceID()
-	spanID := GenerateSpanID()
-
-	ctx = WithTraceID(ctx, traceID)
-	ctx = WithSpanID(ctx, spanID)
-
-	return ctx
-}
-
+// LogAttrError returns an slog.Attr with key "error" for the given error value.
 func LogAttrError(err error) slog.Attr {
-	return slog.String("err", err.Error())
+	return slog.Any("error", err)
 }
 
+// LogAttrTag returns an slog.Attr with key "tag" for the given string value.
 func LogAttrTag(tag string) slog.Attr {
 	return slog.String("tag", tag)
 }
