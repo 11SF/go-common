@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/11SF/go-common/logger"
-	"github.com/Shopify/sarama"
+	"github.com/IBM/sarama"
 )
 
 // ProducerConfig holds settings for the Kafka producer.

@@ -6,7 +6,7 @@ import (
 	"crypto/tls"
 	"hash"
 
-	"github.com/Shopify/sarama"
+	"github.com/IBM/sarama"
 	"github.com/xdg-go/scram"
 )
 

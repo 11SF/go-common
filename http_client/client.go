@@ -127,9 +127,54 @@ func Post[REQ, RES any](client Client, url string, reqBody REQ, headers ...Heade
 	client.logResponse(fasthttp.MethodPost, url, statusCode, resp.Body())
 
 	var res RES
-	err = json.Unmarshal(resp.Body(), &res)
+	if len(resp.Body()) > 0 {
+		if err := json.Unmarshal(resp.Body(), &res); err != nil {
+			return Response[RES]{}, fmt.Errorf("failed to unmarshal response body: %w", err)
+		}
+	}
+
+	return Response[RES]{
+		Code:     statusCode,
+		Response: res,
+	}, nil
+}
+
+// Put sends a PUT request with a JSON payload.
+func Put[REQ, RES any](client Client, url string, reqBody REQ, headers ...HeaderOption) (Response[RES], error) {
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
+
+	bodyData, err := json.Marshal(reqBody)
 	if err != nil {
-		return Response[RES]{}, fmt.Errorf("failed to unmarshal response body: %w", err)
+		return Response[RES]{}, fmt.Errorf("failed to marshal request body: %w", err)
+	}
+
+	req.SetRequestURI(url)
+	req.Header.SetMethod(fasthttp.MethodPut)
+	for _, headerFunc := range lo.Concat(client.DefaultHeaderOptions, headers) {
+		k, v := headerFunc()
+		req.Header.Set(k, v)
+	}
+	req.SetBody(bodyData)
+
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(resp)
+
+	client.logRequest(fasthttp.MethodPut, url, bodyData)
+
+	err = client.Client.DoTimeout(req, resp, client.Timeout)
+	if err != nil {
+		return Response[RES]{}, fmt.Errorf("failed to make PUT request: %w", err)
+	}
+
+	statusCode := resp.StatusCode()
+	client.logResponse(fasthttp.MethodPut, url, statusCode, resp.Body())
+
+	var res RES
+	if len(resp.Body()) > 0 {
+		if err := json.Unmarshal(resp.Body(), &res); err != nil {
+			return Response[RES]{}, fmt.Errorf("failed to unmarshal response body: %w", err)
+		}
 	}
 
 	return Response[RES]{

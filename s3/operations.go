@@ -21,9 +21,34 @@ type Object struct {
 	ETag         string
 }
 
+// ACLPublicRead is the canned ACL most callers upload public assets with.
+const ACLPublicRead = "public-read"
+
 type UploadOptions struct {
 	ContentType string
 	Metadata    map[string]string
+	// ACL is a canned ACL (e.g. ACLPublicRead). Left unset, the bucket's
+	// default applies.
+	ACL string
+	// CacheControl sets the Cache-Control response header — useful for
+	// distinguishing immutable versioned objects from a mutable "latest"
+	// pointer, for example.
+	CacheControl string
+}
+
+func applyUploadOptions(input *s3.PutObjectInput, opts *UploadOptions) {
+	if opts.ContentType != "" {
+		input.ContentType = aws.String(opts.ContentType)
+	}
+	if len(opts.Metadata) > 0 {
+		input.Metadata = opts.Metadata
+	}
+	if opts.ACL != "" {
+		input.ACL = types.ObjectCannedACL(opts.ACL)
+	}
+	if opts.CacheControl != "" {
+		input.CacheControl = aws.String(opts.CacheControl)
+	}
 }
 
 func (c *Client) Upload(ctx context.Context, key string, data []byte, opts *UploadOptions) error {
@@ -40,14 +65,7 @@ func (c *Client) Upload(ctx context.Context, key string, data []byte, opts *Uplo
 		Key:    aws.String(key),
 		Body:   bytes.NewReader(data),
 	}
-
-	if opts.ContentType != "" {
-		input.ContentType = aws.String(opts.ContentType)
-	}
-
-	if len(opts.Metadata) > 0 {
-		input.Metadata = opts.Metadata
-	}
+	applyUploadOptions(input, opts)
 
 	_, err := c.s3Client.PutObject(ctx, input)
 	if err != nil {
@@ -71,14 +89,7 @@ func (c *Client) UploadFromReader(ctx context.Context, key string, reader io.Rea
 		Key:    aws.String(key),
 		Body:   reader,
 	}
-
-	if opts.ContentType != "" {
-		input.ContentType = aws.String(opts.ContentType)
-	}
-
-	if len(opts.Metadata) > 0 {
-		input.Metadata = opts.Metadata
-	}
+	applyUploadOptions(input, opts)
 
 	_, err := c.s3Client.PutObject(ctx, input)
 	if err != nil {
@@ -282,6 +293,40 @@ func (c *Client) GeneratePresignedURL(ctx context.Context, key string, expiratio
 
 	if err != nil {
 		return "", WrapS3Error(fmt.Errorf("failed to generate presigned URL for %s: %w", key, err))
+	}
+
+	return request.URL, nil
+}
+
+// GeneratePresignedPutURL returns a time-limited URL a client can PUT
+// object bytes to directly, without the upload passing through this
+// server. The caller's PUT request must set Content-Type (and ACL, if acl
+// is non-empty) to exactly what was signed here, or the signature won't
+// match.
+func (c *Client) GeneratePresignedPutURL(ctx context.Context, key, contentType, acl string, expiration time.Duration) (string, error) {
+	if err := ValidateKey(key); err != nil {
+		return "", err
+	}
+
+	input := &s3.PutObjectInput{
+		Bucket: aws.String(c.bucketName),
+		Key:    aws.String(key),
+	}
+	if contentType != "" {
+		input.ContentType = aws.String(contentType)
+	}
+	if acl != "" {
+		input.ACL = types.ObjectCannedACL(acl)
+	}
+
+	presignClient := s3.NewPresignClient(c.s3Client)
+
+	request, err := presignClient.PresignPutObject(ctx, input, func(opts *s3.PresignOptions) {
+		opts.Expires = expiration
+	})
+
+	if err != nil {
+		return "", WrapS3Error(fmt.Errorf("failed to generate presigned PUT URL for %s: %w", key, err))
 	}
 
 	return request.URL, nil

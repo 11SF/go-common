@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/11SF/go-common/logger"
-	"github.com/Shopify/sarama"
+	"github.com/IBM/sarama"
 )
 
 const (
@@ -77,7 +77,6 @@ func NewConsumer(ctx context.Context, cfg ConsumerConfig) (*Consumer, error) {
 	} else {
 		sc.Consumer.Offsets.Initial = sarama.OffsetNewest
 	}
-	// Enable auto-offset-commit is off; we commit manually per message.
 	sc.Consumer.Offsets.AutoCommit.Enable = false
 
 	logger.Info(ctx, "connecting kafka consumer",
@@ -222,7 +221,6 @@ func (h *consumerGroupHandler) process(session sarama.ConsumerGroupSession, m *s
 		}
 	}
 
-	// Always commit offset so a bad message does not block the partition.
 	session.MarkMessage(m, "")
 	session.Commit()
 }
